@@ -48,6 +48,15 @@ def recommend():
     for i in range(5):
         print("#", i, position[i])      
     print("Total", any)
+    
+    max_value = 0
+    for word in wordlist:
+        value = 0
+        for i in range(5):
+            value += position[i][word[i]]
+        if max_value < value:
+            max_value = value
+            print(word, value)
 
 def lambda_handler(event, context):
     id = event['detail']['instance-id']
@@ -72,7 +81,9 @@ def main():
     with open(r"solution_words", 'r') as fp:
         wordlist = fp.readlines()
         print('Total words:', len(wordlist))
-    reduce(',,,,',',,a,r,','ebs')
+    reduce(',,,,',',,,,','')
+    recommend()
+    reduce(',,,,',',,a,r,','bs')
     recommend()
     reduce('r,,,a,',',a,a,r,','ebsd')
     recommend()
