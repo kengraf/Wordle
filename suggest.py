@@ -1,56 +1,64 @@
+"""Module providing word counters."""
 from collections import Counter
 import sys
 
-correct = [5]   # Single character values when a letter is properly placed
-misplace = [5]  # Strings of letters that are in the wrong place
-wrong = ""      # Letters that are not in word
-answers = []    # List of possible solutions
-wordlist = []   # List of words we can attempt
-any = Counter()
-position = [Counter(), Counter(), Counter(), Counter(), Counter()]
+WORDLIST = []   # List of words we can attempt
 
 def reduce(matched=',,,,', misplaced=',,,,', wrong=''):
+    """Function to reduce wordlist based on previous guesses."""
     matched = matched.split(',')
     misplaced = misplaced.split(',')
-    
+
     # Use only words with matched letters
-    for i in range( len(wordlist) -1, -1, -1):
-        word = wordlist[i]
+    for i in range( len(WORDLIST) -1, -1, -1):
+        word = WORDLIST[i]
         for j in range(5):
             if matched[j] != '' and matched[j] != word[j]:
-                wordlist.remove(word)
+                WORDLIST.remove(word)
                 break
 
     # Remove words with any wrong letter
     wrong_set = set(wrong)
-    for i in range( len(wordlist) -1, -1, -1):
-        if wrong_set.intersection(wordlist[i]) != set():
-            wordlist.pop(i)
+    for i in range( len(WORDLIST) -1, -1, -1):
+        if wrong_set.intersection(WORDLIST[i]) != set():
+            WORDLIST.pop(i)
 
-    # Remove words with letters in the wrong position
-    for i in range( len(wordlist) -1, -1, -1):
-        word = wordlist[i]
+    # Remove words with letters in the misplaced position
+    for i in range( len(WORDLIST) -1, -1, -1):
+        word = WORDLIST[i]
         for j in range(5):
             for k in range(len(misplaced[j])):
                 if word[j] == misplaced[j][k]:
-                    wordlist.pop(i)
+                    WORDLIST.pop(i)
                     break
 
+    # Remove words without misplaced letters
+    must_have = set("")
+    for i in range(5):
+        must_have.update( misplaced[i] )
+    if len(must_have) == 0:
+        return
+    for i in range( len(WORDLIST) -1, -1, -1):
+        if must_have.intersection(WORDLIST[i]) == set():
+            WORDLIST.pop(i)
 
 def recommend():
-    global any, position
-    for word in wordlist:
+    """Function to show the best next guess."""
+    any1 = Counter()
+    position = [Counter(), Counter(), Counter(), Counter(), Counter()]
+
+    for word in WORDLIST:
         for i in range(5):
             letter = word[i]
-            any[letter] += 1
+            any1[letter] += 1
             position[i][letter] += 1
-    
+
     for i in range(5):
-        print("#", i, position[i])      
-    print("Total", any)
-    
+        print("#", i, position[i])
+    print("Total", any1)
+
     max_value = 0
-    for word in wordlist:
+    for word in WORDLIST:
         value = 0
         for i in range(5):
             value += position[i][word[i]]
@@ -58,35 +66,32 @@ def recommend():
             max_value = value
             print(word, value)
 
-def lambda_handler(event, context):
-    id = event['detail']['instance-id']
-    ec2 = boto3.resource('ec2')
-    ec2instance = ec2.Instance(id)
-    logger.info('instance-id='+id)
-    instancename = ''
-    for tags in ec2instance.tags:
-        if tags["Key"] == 'DNS':
-            route53update(ec2instance.public_ip_address,tags["Value"]) 
-    logger.info('DNS='+tags["Value"])
-    return ''
-
 def main():
-    # Commandline only used for debugging
-    # Required command format: python suggest.py -c ",,,," -m ",,,," -w ""
-#    correct = sys.argv[2]
-#    misplaced = sys.argv[4]
-#    wrong = sys.argv[6]
-    # TODO make this a URL lookup
-    global wordlist
-    with open(r"solution_words", 'r') as fp:
-        wordlist = fp.readlines()
-        print('Total words:', len(wordlist))
-    reduce(',,,,',',,,,','')
+    """Function to intake prior guesses."""
+
+    global WORDLIST # Global as we iterate to reduce possible words
+
+    # CORRECT (green) should have no more than one letter per position
+    correct = ',,,,'
+    # MISPLACED (yellow) include all letters at that position
+    misplaced = ',,,,'
+    # WRONG (black) just list them any order
+    wrong = ''
+
+    # If args provided override all previous settings
+    args = sys.argv[1:]
+    if len(args) == 6:
+        # Assumed command format: python suggest.py -c ",,,," -m ",,,," -w ""
+        correct = args[1]
+        misplaced = args[3]
+        wrong = args[5]
+
+    with open(r"solution_words", 'r', encoding='UTF-8') as fp:
+        WORDLIST = fp.readlines()
+        print('Total words:', len(WORDLIST))
+
+    reduce(correct,misplaced,wrong)
     recommend()
-    reduce(',,,,',',,a,r,','bs')
-    recommend()
-    reduce('r,,,a,',',a,a,r,','ebsd')
-    recommend()
-    
+
 if __name__ == "__main__":
     main()
